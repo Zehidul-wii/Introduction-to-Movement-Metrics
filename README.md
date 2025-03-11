@@ -1,1 +1,1 @@
-# Introduction-to-Movement-Metrics
+# Introduction to Movement Analysis
