@@ -1,7 +1,7 @@
-library(amt)
+library(amt) 
 library(lubridate)
 library(move)
-library(suncalc) 
+library(suncalc)
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
@@ -10,82 +10,88 @@ library(RColorBrewer)
 library(sf)
 
 
-##Input file
-data("amt_fisher")
+## Set directory
+setwd("C:/Users/student/Desktop/working folder/UMD/Teaching")
 
-#' Create a data frame 
-fisher.dat <- as(amt_fisher, "data.frame")
+
+# Input CSV file
+deer <- read.csv("Movement chareacteristics_Deer.csv")
 
 # Inspect the data
-head(fisher.dat)
-str(fisher.dat)
+head(deer)
+str(deer)
 
 ##make a new column
-#fisher.dat$ts <- as.POSIXct(lubridate::dmy_hms(fisher.dat$utc.datetime))
-#fisher.dat$ts <- as.POSIXct(lubridate::dmy(fisher.dat$utc_date) + lubridate::hms(fisher.dat$utc_time))
-#fisher.dat$ts<-as.POSIXct(fisher.dat$ts, format="%Y-%m-%d %H:%M:%0S", tz = "UTC")
+#deer$ts <- as.POSIXct(lubridate::mdy_hm(deer$datetime_local))
+deer$ts <- as.POSIXct(lubridate::mdy(deer$Date) + lubridate::hm(deer$GMT_TimeStamp))
 
+#check the local time zone
+Sys.timezone(location = TRUE)
+deer$ts<-as.POSIXct(deer$ts, format="%Y-%m-%d %H:%M:%0S", tz = "UTC")
+#deer$ts<-as.POSIXct(deer$ts, format="%Y-%m-%d %H:%M:%0S", tz = "America/New_York")
 
 #' ### Data cleaning
 #' Delete observations where missing lat or long or a timestamp.  There are no missing
 #' observations in this data set, but it is still good practice to check.
-ind <- complete.cases(fisher.dat[, c("x_", "y_", "t_")]) # x= longitude(UTM E)/ y= latitude (UTM N)
+ind <- complete.cases(deer[, c("location_long", "location_lat", "ts")]) # x= longitude(UTM E)/ y= latitude (UTM N)
 
 
-#' The number of relocations with missing coordinates or timestamp (if any).
-table(ind) # Check how many are complete
+# The number of relocation with missing coordinates or timestamp (if any).
+# Check how many are complete
+table(ind)
 
 # Keep only complete cases
-fisher.dat <- fisher.dat %>% filter(ind) 
+deer <- deer %>% filter(ind)
 
 
 #' Check for duplicated observations (ones with same lat, long, timestamp,
 #'  and individual identifier). There are no duplicate
 #' observations in this data set, but it is still good practice to check.
-ind2 <- fisher.dat %>% 
-  select(t_, x_, y_, id) %>%
+ind2 <- deer %>% 
+  select(ts, location_long, location_lat, individual_local_identifier) %>%
   duplicated
 sum(ind2) # no duplicates
 
 # Remove duplicates if any
-fisher.dat <- fisher.dat %>% filter(!ind2)
+deer <- deer %>% filter(!ind2)
 
 
-#' ### Using `ggplot2` to plot the data
-#' Use separate axes for each individual (add scales="free" to facet_wrap)
-ggplot(fisher.dat, aes(x = x_, 
-                       y = y_)) + geom_point() +
-  facet_wrap(~id, scales = "free")
+# Using `ggplot2` to plot the data
+# Use separate axes for each individual (add scales="free" to facet_wrap)
+ggplot(deer, aes(x = location_long, 
+                 y = location_lat)) + geom_point() +
+  facet_wrap(~individual_local_identifier, scales = "free")
 
 
-#' Plot all individuals together
-ggplot(fisher.dat, 
-       aes(x_, y_, color = id, 
-           group = id))+
+# Now, we plot all individuals in single plot
+ggplot(deer, 
+       aes(location_long, location_lat, color = individual_local_identifier, 
+           group = individual_local_identifier))+
   geom_point() + coord_equal() +
   theme(legend.position = "bottom")
 
 
 ## Creating a track in amt
-#' Before we can use the `amt` package to calculate step lengths, turn angles, and bearings
-#' for fisher data, we need to add a class (track) to the data. Then, we can summarize 
-#' the data by individual, month, etc.
+# Before we can use the `amt` package to calculate step lengths, turn angles and oher movement menterics
+# we need to add a class (track) to the data. Then, we can summarize the data by individual, month, etc.
+#If we have a data set with  projected coordinates (UTM), we can use:
+#trk <- make_track(deer, .x=utm.easting, .y=utm.northing, .t=timestamp, id = individual_local.identifier) 
 
+# When using lat and lon
+trk <- make_track(deer, 
+                  .x = location_long, 
+                  .y = location_lat, 
+                  date_local = date_local,
+                  study_local_timestamp = study_local_timestamp,
+                  .t = ts, 
+                  id = individual_local_identifier, 
+                  crs = 4326)  # WGS 84 Lat/Lon
 
-# we have a data set in UTM
-trk <- make_track(fisher.dat, .x=x_, .y=y_, .t=t_, id = id, crs = 32618) # coordinates already in UTM
-
-
-# When using dataset in lat/lon
-#trk <- make_track(fisher.dat, .x = longitude, .y = latitude, .t = timestamp, 
-#                  id = individual_local.identifier, crs = 4326)  # WGS 84 Lat/Lon 
-
-
-# Transform the track from geographic coordinates (lat/lon) to Projected Coordinated system UTM Zone 18N (EPSG: 32618)
-#trk <- transform_coords(trk, 32618)
+# Transform to Projected Coordinated System UTM Zone 18N (EPSG: 32618)
+trk <- transform_coords(trk, 32618)
 
 # Now  calculate day/night from the movement track
-trk <- trk %>% time_of_day(include.crepuscule = FALSE) 
+trk <- trk %>% time_of_day(include.crepuscule = TRUE) 
 
 ###
 trk.class<-class(trk)
@@ -114,11 +120,9 @@ nesttrk
 #' from the first individual using:
 nesttrk$data[[1]]
 
-
 #' We could calculate movement characteristics by individual using:
 data.steplength <-step_lengths(nesttrk$data[[1]])
 head(data.steplength)
-
 
 # Or we can add a columns to each nested column of data using `purrr::map`
 trk1 <-trk %>% nest(-id) %>% 
@@ -128,9 +132,8 @@ trk1 <-trk %>% nest(-id) %>%
          nsd =map(data, nsd))%>%unnest()
 
 ###
-class(trk1)<-trk.class
+class(trk1) <- trk.class
 trk1
-
 
 #' Now, calculate month, year, hour, week of each observation and add these to the dataset.
 #' Unlike the movement characteristics, these calculations can be done all at once, 
@@ -144,18 +147,17 @@ trk1 <- trk1 %>%
 
 
 ###save 
-write.csv(trk1,"movement_parameter.csv", row.names = FALSE)
+write.csv(trk1,"movement_metrics_deer.csv", row.names = FALSE)
 
-###Exploring more movement metrics
-tot_dist()
-cum_dist()
-straightness()
-msd()
-intensity_use()
+###Exploring more movement metrics (https://cran.r-project.org/web/packages/amt/amt.pdf)
+#tot_dist()
+#cum_dist()
+#straightness()
+#msd()
+#intensity_use()
 
 
-# Some plots of movement characteristics
-
+###  Some plots of movement characteristics ####
 
 #'Step length distribution by day/night, hour, month
 ggplot(trk1, aes(x = tod_, y = log(sl), fill = tod_)) + 
@@ -168,8 +170,8 @@ ggplot(trk1, aes(x = tod_, y = log(sl), fill = tod_)) +
   ggtitle("Step Length Distribution by Day/Night") + 
   theme(
     legend.position = "none",
-    strip.text = element_text(size = 12),
-    plot.title = element_text(hjust = 0.5))
+    strip.text = element_text(size = 12, face = "bold"),
+    plot.title = element_text(hjust = 0.5, face = "bold"))
 
 
 
@@ -201,10 +203,10 @@ ggplot(trk1, aes(x = dir_rel, y = ..density.., fill = ..density..)) +
 
 
 ### Net-squared displacement
+
 ggplot(trk1, aes(x = t_, y = nsd, color = id, group = id)) + 
   geom_path(size = 1) + 
   facet_wrap(~id, scales = "free") +
-  scale_color_viridis(discrete = TRUE, option = "D") + 
   labs(
     title = "Net-Squared Displacement",
     x = "Date",
@@ -219,5 +221,8 @@ ggplot(trk1, aes(x = t_, y = nsd, color = id, group = id)) +
   ) +
   guides(color = guide_legend(nrow = 1, byrow = TRUE))
 
-## End ##
+
+####End####
+
+
 
