@@ -11,11 +11,11 @@ library(sf)
 
 
 ## Set directory
-setwd("C:/Users/student/Desktop/working folder/UMD/Teaching")
+setwd("Copy your working directory path")
 
 
 # Input CSV file
-deer <- read.csv("Movement chareacteristics_Deer.csv")
+deer <- read.csv("Movement characteristics_example.csv")
 
 # Inspect the data
 head(deer)
@@ -23,10 +23,10 @@ str(deer)
 
 ##make a new column
 #deer$ts <- as.POSIXct(lubridate::mdy_hm(deer$datetime_local))
-deer$ts <- as.POSIXct(lubridate::mdy(deer$Date) + lubridate::hm(deer$GMT_TimeStamp))
+deer$ts <- as.POSIXct(lubridate::mdy(deer$Date) + lubridate::hms(deer$GMT_TimeStamp))
 
 #check the local time zone
-Sys.timezone(location = TRUE)
+#Sys.timezone(location = TRUE)
 deer$ts<-as.POSIXct(deer$ts, format="%Y-%m-%d %H:%M:%0S", tz = "UTC")
 #deer$ts<-as.POSIXct(deer$ts, format="%Y-%m-%d %H:%M:%0S", tz = "America/New_York")
 
@@ -201,9 +201,7 @@ ggplot(trk1, aes(x = dir_rel, y = ..density.., fill = ..density..)) +
   )
 
 
-
 ### Net-squared displacement
-
 ggplot(trk1, aes(x = t_, y = nsd, color = id, group = id)) + 
   geom_path(size = 1) + 
   facet_wrap(~id, scales = "free") +
@@ -223,6 +221,8 @@ ggplot(trk1, aes(x = t_, y = nsd, color = id, group = id)) +
 
 
 ####End####
+
+
 
 
 
