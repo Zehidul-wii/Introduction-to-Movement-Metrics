@@ -1,4 +1,4 @@
-Animal Movement and Analysis
+**Animal Movement and Analysis**
 
 This repository focuses on analyzing animal movement metrics using GPS telemetry data. Using R packages like amt and move, the analysis explores spatial and temporal variations in movement, identifying key behaviors such as migratory, resident, and dispersal movements.
 
